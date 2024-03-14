@@ -48,14 +48,14 @@ int main(int argc, char **argv) {
   Renderer renderer;
 
   //viewplane is from 0 to WIDTH and 0 to HEIGHT
-  //camera/origin is at the center of the viewplane by x,y and z depends on the focal length
-  Vect origin = {WIDTH/2, HEIGHT/2, -(WIDTH / info->focal_length)};
+  //camera/origin is at the center of the viewplane by x,y and z = -800.0f
+  Vect origin = {WIDTH/2, HEIGHT/2, -800.0f};
 
   for (int y = 0; y < HEIGHT; y++) {
     for (int x = 0; x < WIDTH; x++) {
       float tSphere = std::numeric_limits<float>::max();
 
-      Vect pixel = {x + 0.5f, y + 0.5f, 0.0f};
+      Vect pixel = {x + 0.5f, y + 0.5f, origin.z + (WIDTH*info->focal_length)};
       Vect d = pixel - origin;
 
       std::vector<Sphere *> spheres = info->spheres;
