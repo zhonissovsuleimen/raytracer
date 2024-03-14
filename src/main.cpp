@@ -47,13 +47,12 @@ int main(int argc, char **argv) {
   Frame frame;
   Renderer renderer;
 
-  Vect origin = {0.0f, 0.0f, (WIDTH / info->focal_length)};
+  //viewplane is from 0 to WIDTH and 0 to HEIGHT
+  //camera/origin is at the center of the viewplane by x,y and z depends on the focal length
+  Vect origin = {WIDTH/2, HEIGHT/2, -(WIDTH / info->focal_length)};
 
-  float xdiff = WIDTH / 2;
-  float ydiff = HEIGHT / 2;
-
-  for (int y = -ydiff; y < HEIGHT / 2; y++) {
-    for (int x = -xdiff; x < WIDTH / 2; x++) {
+  for (int y = 0; y < HEIGHT; y++) {
+    for (int x = 0; x < WIDTH; x++) {
       float tSphere = std::numeric_limits<float>::max();
 
       Vect pixel = {x + 0.5f, y + 0.5f, 0.0f};
@@ -74,7 +73,7 @@ int main(int argc, char **argv) {
           float t2 = (-b - sqrt_disc) / (2 * a);
 
           tSphere = std::min(t1, t2);
-          frame.setColor(x + xdiff, y + ydiff, spheres[i]->material->color);
+          frame.setColor(x, y, spheres[i]->material->color);
         }
       }
 
@@ -119,7 +118,7 @@ int main(int argc, char **argv) {
         float beta = matrixBeta.deteminant() / detA;
         if (beta < 0.0f || beta > 1.0f - gamma) { continue; }
 
-        frame.setColor(x + xdiff, y + ydiff, triangles[i]->material->color);
+        frame.setColor(x, y, triangles[i]->material->color);
       }
     }
   }
