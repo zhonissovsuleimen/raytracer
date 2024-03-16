@@ -30,9 +30,19 @@ void drawSphere(Frame &frame, Sphere *sphere, Vect &origin, RenderingInfo *info,
       float lesser_t = (t1 < t2) ? t1 : t2;
 
       if (lesser_t > zbuffer[x][y]) { continue; }
-
       zbuffer[x][y] = lesser_t;
-      frame.setColor(x, y, sphere->material->color);
+      
+      float coef = 0.0f;
+      Vect hit = origin + d * lesser_t;
+      Vect n = (hit - center).normalize();
+
+      std::vector<Light *> point_lights = info->point_lights;
+      for(int i = 0; i < point_lights.size(); i++){
+        Vect l = (point_lights[i]->position - hit).normalize();
+        coef += point_lights[i]->intensity * std::max(0.0f, l * n);
+      }
+      
+      frame.setColor(x, y, sphere->material->color * coef);
     }
   }
 }
@@ -73,9 +83,22 @@ void drawTriangle(Frame &frame, Triangle *triangle, Vect &origin, RenderingInfo 
 
       float beta = matrixBeta.deteminant() / detA;
       if (beta < 0.0f || beta > 1.0f - gamma) { continue; }
-
       zbuffer[x][y] = t;
-      frame.setColor(x, y, triangle->material->color);
+
+      float coef = 0.0f;
+      Vect hit = origin + d * t;
+      float nx = (p1 - p2) * (p2 - p1);
+      float ny = (p2 - p0) * (p0 - p2);
+      float nz = (p0 - p1) * (p1 - p0);
+      Vect n = Vect{nx, ny, nz}.normalize();
+
+      std::vector<Light *> point_lights = info->point_lights;
+      for(int i = 0; i < point_lights.size(); i++){
+        Vect l = (point_lights[i]->position - hit).normalize();
+        coef += point_lights[i]->intensity * std::max(0.0f, l * n);
+      }
+      
+      frame.setColor(x, y, triangle->material->color * coef);
     }
   }
 }
