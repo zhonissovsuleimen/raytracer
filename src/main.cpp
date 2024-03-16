@@ -1,6 +1,6 @@
 #include <iostream>
-#include <string>
 #include <limits>
+#include <string>
 
 #include "configfile/parser.h"
 #include "configfile/scenedata.h"
@@ -8,25 +8,74 @@
 #include "renderer/renderer.h"
 #include "renderer/renderer_types.h"
 
-class TestSquare {
-private:
-  float n;
+void drawSphere(Frame &frame, Sphere *sphere, Vect &origin, RenderingInfo *info, std::vector<std::vector<float>> &zbuffer) {
+  Vect center = sphere->center;
+  float radius = sphere->radius;
 
-public:
-  TestSquare() : n(0) {}
-  void drawSquare(Frame &frame);
-};
+  for (int y = 0; y < HEIGHT; y++) {
+    for (int x = 0; x < WIDTH; x++) {
+      Vect pixel = {x + 0.5f, y + 0.5f, origin.z + (WIDTH * info->focal_length)};
+      Vect d = pixel - origin;
 
-void TestSquare::drawSquare(Frame &frame) {
-  n += 0.1;
-  float sn = sin(n);
-  float cn = cos(n);
-  int x = 400 + (int)(sn * 100);
-  int y = 300 + (int)(cn * 100);
-  Color c = {1.0, 0, 0};
-  for (int i = 0; i < 10; i++) {
-    for (int j = 0; j < 10; j++) {
-      frame.setColor(x + i, y + j, c);
+      float a = d * d;
+      float b = (2 * d) * (origin - center);
+      float c = (origin - center) * (origin - center) - radius * radius;
+
+      float discriminant = b * b - 4 * a * c;
+      if (discriminant < 0) { continue; }
+
+      float sqrt_disc = sqrt(discriminant);
+      float t1 = (-b + sqrt_disc) / (2 * a);
+      float t2 = (-b - sqrt_disc) / (2 * a);
+      float lesser_t = (t1 < t2) ? t1 : t2;
+
+      if (lesser_t > zbuffer[x][y]) { continue; }
+
+      zbuffer[x][y] = lesser_t;
+      frame.setColor(x, y, sphere->material->color);
+    }
+  }
+}
+
+void drawTriangle(Frame &frame, Triangle *triangle, Vect &origin, RenderingInfo *info, std::vector<std::vector<float>> &zbuffer) {
+  Vect p0 = triangle->p0;
+  Vect p1 = triangle->p1;
+  Vect p2 = triangle->p2;
+
+  for (int y = 0; y < HEIGHT; y++) {
+    for (int x = 0; x < WIDTH; x++) {
+      Vect pixel = {x + 0.5f, y + 0.5f, origin.z + (WIDTH * info->focal_length)};
+      Vect d = pixel - origin;
+
+      Matrix3D matrixA = {p0.x - p1.x, p0.x - p2.x, d.x,
+                          p0.y - p1.y, p0.y - p2.y, d.y,
+                          p0.z - p1.z, p0.z - p2.z, d.z};
+
+      float detA = matrixA.deteminant();
+
+      Matrix3D matrixT = {p0.x - p1.x, p0.x - p2.x, p0.x - origin.x,
+                          p0.y - p1.y, p0.y - p2.y, p0.y - origin.y,
+                          p0.z - p1.z, p0.z - p2.z, p0.z - origin.z};
+
+      float t = matrixT.deteminant() / detA;
+      if (t < 0.0f || t > zbuffer[x][y]) { continue; }
+
+      Matrix3D matrixGamma = {p0.x - p1.x, p0.x - origin.x, d.x,
+                              p0.y - p1.y, p0.y - origin.y, d.y,
+                              p0.z - p1.z, p0.z - origin.z, d.z};
+
+      float gamma = matrixGamma.deteminant() / detA;
+      if (gamma < 0.0f || gamma > 1.0f) { continue; }
+
+      Matrix3D matrixBeta = {p0.x - origin.x, p0.x - p2.x, d.x,
+                             p0.y - origin.y, p0.y - p2.y, d.y,
+                             p0.z - origin.z, p0.z - p2.z, d.z};
+
+      float beta = matrixBeta.deteminant() / detA;
+      if (beta < 0.0f || beta > 1.0f - gamma) { continue; }
+
+      zbuffer[x][y] = t;
+      frame.setColor(x, y, triangle->material->color);
     }
   }
 }
@@ -47,92 +96,19 @@ int main(int argc, char **argv) {
   Frame frame;
   Renderer renderer;
 
-  //viewplane is from 0 to WIDTH and 0 to HEIGHT
-  //camera/origin is at the center of the viewplane by x,y and z = -800.0f
-  Vect origin = {WIDTH/2, HEIGHT/2, -800.0f};
-  Color color = {0.0f, 0.0f, 0.0f};
+  // viewplane is from 0 to WIDTH and 0 to HEIGHT
+  // camera/origin is at the center of the viewplane by x,y and z = -800.0f
+  Vect origin = {WIDTH / 2, HEIGHT / 2, -800.0f};
+  std::vector<std::vector<float>> zbuffer(WIDTH, std::vector<float>(HEIGHT, std::numeric_limits<float>::max()));
 
-  for (int y = 0; y < HEIGHT; y++) {
-    for (int x = 0; x < WIDTH; x++) {
-      float min_t = std::numeric_limits<float>::max();
-      float local_t = std::numeric_limits<float>::max(); 
-      
-      Vect pixel = {x + 0.5f, y + 0.5f, origin.z + (WIDTH*info->focal_length)};
-      Vect d = pixel - origin;
+  std::vector<Sphere *> spheres = info->spheres;
+  for (int i = 0; i < spheres.size(); i++) {
+    drawSphere(frame, spheres[i], origin, info, zbuffer);
+  }
 
-      std::vector<Sphere *> spheres = info->spheres;
-      for (int i = 0; i < spheres.size(); i++) {
-        float a = d * d;
-        float b = (2 * d) * (origin - spheres[i]->center);
-        float c =
-            (origin - spheres[i]->center) * (origin - spheres[i]->center) -
-            spheres[i]->radius * spheres[i]->radius;
-
-        float discriminant = b * b - 4 * a * c;
-        if (discriminant >= 0) {
-          float sqrt_disc = sqrt(discriminant);
-          float t1 = (-b + sqrt_disc) / (2 * a);
-          float t2 = (-b - sqrt_disc) / (2 * a);
-
-          local_t = (t1 < t2) ? t1 : t2;
-          if(local_t < min_t) {
-            min_t = local_t;
-            color = spheres[i]->material->color;
-          }
-        }
-      }
-
-      std::vector<Triangle *> triangles = info->triangles;
-      for (int i = 0; i < triangles.size(); i++) {
-        Vect p0 = triangles[i]->p0;
-        Vect p1 = triangles[i]->p1;
-        Vect p2 = triangles[i]->p2;
-
-        Matrix3D matrixA = {
-          p0.x - p1.x, p0.x - p2.x, d.x,
-          p0.y - p1.y, p0.y - p2.y, d.y,
-          p0.z - p1.z, p0.z - p2.z, d.z
-        };
-
-        float detA = matrixA.deteminant();
-
-        Matrix3D matrixT = {
-          p0.x - p1.x, p0.x - p2.x, p0.x - origin.x,
-          p0.y - p1.y, p0.y - p2.y, p0.y - origin.y,
-          p0.z - p1.z, p0.z - p2.z, p0.z - origin.z
-        };
-
-        float local_t = matrixT.deteminant() / detA;
-        if (local_t < 0.0f || local_t > min_t) { continue; }
-
-        Matrix3D matrixGamma = {
-          p0.x - p1.x, p0.x - origin.x, d.x,
-          p0.y - p1.y, p0.y - origin.y, d.y,
-          p0.z - p1.z, p0.z - origin.z, d.z
-        };
-
-        float gamma = matrixGamma.deteminant() / detA;
-        if (gamma < 0.0f || gamma > 1.0f) { continue; }
-
-        Matrix3D matrixBeta = {
-          p0.x - origin.x, p0.x - p2.x, d.x,
-          p0.y - origin.y, p0.y - p2.y, d.y,
-          p0.z - origin.z, p0.z - p2.z, d.z
-        };
-
-        float beta = matrixBeta.deteminant() / detA;
-        if (beta < 0.0f || beta > 1.0f - gamma) { continue; }
-
-        if (local_t < min_t) {
-          min_t = local_t;
-          color = triangles[i]->material->color;
-        }
-      }
-
-      if(min_t != std::numeric_limits<float>::max()) {
-        frame.setColor(x, y, color);
-      }
-    }
+  std::vector<Triangle *> triangles = info->triangles;
+  for (int i = 0; i < triangles.size(); i++) {
+    drawTriangle(frame, triangles[i], origin, info, zbuffer);
   }
 
   if (!renderer.init(frame)) {
@@ -140,7 +116,6 @@ int main(int argc, char **argv) {
     return 1;
   }
   while (renderer.render()) {
-
     // frame.clear();
     // renderer.changeFrame(frame);
   }
