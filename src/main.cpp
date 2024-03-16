@@ -50,11 +50,13 @@ int main(int argc, char **argv) {
   //viewplane is from 0 to WIDTH and 0 to HEIGHT
   //camera/origin is at the center of the viewplane by x,y and z = -800.0f
   Vect origin = {WIDTH/2, HEIGHT/2, -800.0f};
+  Color color = {0.0f, 0.0f, 0.0f};
 
   for (int y = 0; y < HEIGHT; y++) {
     for (int x = 0; x < WIDTH; x++) {
-      float tSphere = std::numeric_limits<float>::max();
-
+      float min_t = std::numeric_limits<float>::max();
+      float local_t = std::numeric_limits<float>::max(); 
+      
       Vect pixel = {x + 0.5f, y + 0.5f, origin.z + (WIDTH*info->focal_length)};
       Vect d = pixel - origin;
 
@@ -72,8 +74,11 @@ int main(int argc, char **argv) {
           float t1 = (-b + sqrt_disc) / (2 * a);
           float t2 = (-b - sqrt_disc) / (2 * a);
 
-          tSphere = std::min(t1, t2);
-          frame.setColor(x, y, spheres[i]->material->color);
+          local_t = (t1 < t2) ? t1 : t2;
+          if(local_t < min_t) {
+            min_t = local_t;
+            color = spheres[i]->material->color;
+          }
         }
       }
 
@@ -92,13 +97,13 @@ int main(int argc, char **argv) {
         float detA = matrixA.deteminant();
 
         Matrix3D matrixT = {
-          p0.x - p1.x, p0.x - origin.x, d.x,
-          p0.y - p1.y, p0.y - origin.y, d.y,
-          p0.z - p1.z, p0.z - origin.z, d.z
+          p0.x - p1.x, p0.x - p2.x, p0.x - origin.x,
+          p0.y - p1.y, p0.y - p2.y, p0.y - origin.y,
+          p0.z - p1.z, p0.z - p2.z, p0.z - origin.z
         };
 
-        float t = matrixT.deteminant() / detA;
-        if (t < 0.0f || t > tSphere) { continue; }
+        float local_t = matrixT.deteminant() / detA;
+        if (local_t < 0.0f || local_t > min_t) { continue; }
 
         Matrix3D matrixGamma = {
           p0.x - p1.x, p0.x - origin.x, d.x,
@@ -118,7 +123,14 @@ int main(int argc, char **argv) {
         float beta = matrixBeta.deteminant() / detA;
         if (beta < 0.0f || beta > 1.0f - gamma) { continue; }
 
-        frame.setColor(x, y, triangles[i]->material->color);
+        if (local_t < min_t) {
+          min_t = local_t;
+          color = triangles[i]->material->color;
+        }
+      }
+
+      if(min_t != std::numeric_limits<float>::max()) {
+        frame.setColor(x, y, color);
       }
     }
   }
