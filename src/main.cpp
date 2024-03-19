@@ -1,107 +1,6 @@
-#include <iostream>
-#include <limits>
-#include <string>
-
 #include "configfile/parser.h"
-#include "configfile/scenedata.h"
-#include "matrix/matrix.h"
 #include "renderer/renderer.h"
-#include "renderer/renderer_types.h"
-
-void drawSphere(Frame &frame, Sphere *sphere, Vect &origin, RenderingInfo *info, std::vector<std::vector<float>> &zbuffer) {
-  Vect center = sphere->center;
-  float radius = sphere->radius;
-
-  for (int y = 0; y < HEIGHT; y++) {
-    for (int x = 0; x < WIDTH; x++) {
-      Vect pixel = {x + 0.5f, y + 0.5f, origin.z + (WIDTH * info->focal_length)};
-      Vect d = pixel - origin;
-
-      float a = d * d;
-      float b = (2 * d) * (origin - center);
-      float c = (origin - center) * (origin - center) - radius * radius;
-
-      float discriminant = b * b - 4 * a * c;
-      if (discriminant < 0) { continue; }
-
-      float sqrt_disc = sqrt(discriminant);
-      float t1 = (-b + sqrt_disc) / (2 * a);
-      float t2 = (-b - sqrt_disc) / (2 * a);
-      float lesser_t = (t1 < t2) ? t1 : t2;
-
-      if (lesser_t > zbuffer[x][y]) { continue; }
-      zbuffer[x][y] = lesser_t;
-      
-      float coef = 0.0f;
-      Vect hit = origin + d * lesser_t;
-      Vect n = (hit - center).normalize();
-
-      std::vector<Light *> point_lights = info->point_lights;
-      for(int i = 0; i < point_lights.size(); i++){
-        Vect l = (point_lights[i]->position - hit).normalize();
-        coef += point_lights[i]->intensity * std::max(0.0f, l * n);
-      }
-      
-      frame.setColor(x, y, sphere->material->color * coef);
-    }
-  }
-}
-
-void drawTriangle(Frame &frame, Triangle *triangle, Vect &origin, RenderingInfo *info, std::vector<std::vector<float>> &zbuffer) {
-  Vect p0 = triangle->p0;
-  Vect p1 = triangle->p1;
-  Vect p2 = triangle->p2;
-
-  for (int y = 0; y < HEIGHT; y++) {
-    for (int x = 0; x < WIDTH; x++) {
-      Vect pixel = {x + 0.5f, y + 0.5f, origin.z + (WIDTH * info->focal_length)};
-      Vect d = pixel - origin;
-
-      Matrix3D matrixA = {p0.x - p1.x, p0.x - p2.x, d.x,
-                          p0.y - p1.y, p0.y - p2.y, d.y,
-                          p0.z - p1.z, p0.z - p2.z, d.z};
-
-      float detA = matrixA.deteminant();
-
-      Matrix3D matrixT = {p0.x - p1.x, p0.x - p2.x, p0.x - origin.x,
-                          p0.y - p1.y, p0.y - p2.y, p0.y - origin.y,
-                          p0.z - p1.z, p0.z - p2.z, p0.z - origin.z};
-
-      float t = matrixT.deteminant() / detA;
-      if (t < 0.0f || t > zbuffer[x][y]) { continue; }
-
-      Matrix3D matrixGamma = {p0.x - p1.x, p0.x - origin.x, d.x,
-                              p0.y - p1.y, p0.y - origin.y, d.y,
-                              p0.z - p1.z, p0.z - origin.z, d.z};
-
-      float gamma = matrixGamma.deteminant() / detA;
-      if (gamma < 0.0f || gamma > 1.0f) { continue; }
-
-      Matrix3D matrixBeta = {p0.x - origin.x, p0.x - p2.x, d.x,
-                             p0.y - origin.y, p0.y - p2.y, d.y,
-                             p0.z - origin.z, p0.z - p2.z, d.z};
-
-      float beta = matrixBeta.deteminant() / detA;
-      if (beta < 0.0f || beta > 1.0f - gamma) { continue; }
-      zbuffer[x][y] = t;
-
-      float coef = 0.0f;
-      Vect hit = origin + d * t;
-      float nx = (p1 - p2) * (p2 - p1);
-      float ny = (p2 - p0) * (p0 - p2);
-      float nz = (p0 - p1) * (p1 - p0);
-      Vect n = Vect{nx, ny, nz}.normalize();
-
-      std::vector<Light *> point_lights = info->point_lights;
-      for(int i = 0; i < point_lights.size(); i++){
-        Vect l = (point_lights[i]->position - hit).normalize();
-        coef += point_lights[i]->intensity * std::max(0.0f, l * n);
-      }
-      
-      frame.setColor(x, y, triangle->material->color * coef);
-    }
-  }
-}
+#include "raytracer/raytracer.h"
 
 int main(int argc, char **argv) {
   if (argc < 2) {
@@ -119,21 +18,21 @@ int main(int argc, char **argv) {
   Frame frame;
   Renderer renderer;
 
-  // viewplane is from 0 to WIDTH and 0 to HEIGHT
-  // camera/origin is at the center of the viewplane by x,y and z = -800.0f
-  Vect origin = {WIDTH / 2, HEIGHT / 2, -800.0f};
-  std::vector<std::vector<float>> zbuffer(WIDTH, std::vector<float>(HEIGHT, std::numeric_limits<float>::max()));
+  Vect origin = {0.0f, 0.0f, 0.0f};
+  Raytracer raytracer(origin, info);
+  float min = -1.0f;
+  float max = 1.0f;
 
-  std::vector<Sphere *> spheres = info->spheres;
-  for (int i = 0; i < spheres.size(); i++) {
-    drawSphere(frame, spheres[i], origin, info, zbuffer);
+  for(int y = 0; y < HEIGHT; y++){
+    for(int x = 0; x < WIDTH; x++){
+      Vect pixel = {(min + 2*(x + 0.5f)/WIDTH), min + 2*(y + 0.5f)/HEIGHT, info->focal_length};
+      Vect d = pixel - origin;
+      Color c = raytracer.rayCast(d);
+      
+      frame.setColor(x, y, c);
+    }
   }
-
-  std::vector<Triangle *> triangles = info->triangles;
-  for (int i = 0; i < triangles.size(); i++) {
-    drawTriangle(frame, triangles[i], origin, info, zbuffer);
-  }
-
+  
   if (!renderer.init(frame)) {
     std::cout << "Failed to init renderer" << std::endl;
     return 1;
