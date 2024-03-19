@@ -1,7 +1,7 @@
 #include "raytracer.h"
 #include "../matrix/matrix.h"
 
-bool Raytracer::hits(Vect &direction, Sphere *sphere, float min_t, float max_t, float &return_t) {
+bool Raytracer::hits(Vect &origin, Vect &direction, Sphere *sphere, float min_t, float max_t, float &return_t) {
   Vect center = sphere->center;
   float radius = sphere->radius;
 
@@ -22,7 +22,7 @@ bool Raytracer::hits(Vect &direction, Sphere *sphere, float min_t, float max_t, 
   return true;
 }
 
-bool Raytracer::hits(Vect &direction, Triangle *triangle, float min_t, float max_t, float &return_t) {
+bool Raytracer::hits(Vect &origin, Vect &direction, Triangle *triangle, float min_t, float max_t, float &return_t) {
   Vect p0 = triangle->p0;
   Vect p1 = triangle->p1;
   Vect p2 = triangle->p2;
@@ -58,7 +58,7 @@ bool Raytracer::hits(Vect &direction, Triangle *triangle, float min_t, float max
   return true;
 }
 
-Color Raytracer::rayCast(Vect &direction) {
+Color Raytracer::rayCast(Vect &origin, Vect &direction) {
   float t = std::numeric_limits<float>::max();
   Material material;
   Vect n;
@@ -66,7 +66,7 @@ Color Raytracer::rayCast(Vect &direction) {
   std::vector<Sphere *> spheres = info->spheres;
   for (int i = 0; i < spheres.size(); i++) {
     float return_t;
-    if (!hits(direction, spheres[i], 0.0f, std::numeric_limits<float>::max(), return_t) 
+    if (!hits(origin, direction, spheres[i], 0.0f, std::numeric_limits<float>::max(), return_t) 
         || return_t >= t) { continue; }
     t = return_t;
     material = *spheres[i]->material;
@@ -78,7 +78,7 @@ Color Raytracer::rayCast(Vect &direction) {
   std::vector<Triangle *> triangles = info->triangles;
   for (int i = 0; i < triangles.size(); i++) {
     float return_t;
-    if (! hits(direction, triangles[i], 0.0f, std::numeric_limits<float>::max(), return_t) 
+    if (! hits(origin, direction, triangles[i], 0.0f, std::numeric_limits<float>::max(), return_t) 
         || return_t >= t) { continue; }
     t = return_t;
     material = *triangles[i]->material;
@@ -92,7 +92,7 @@ Color Raytracer::rayCast(Vect &direction) {
     float nx = ab.y * ac.z - ab.z * ac.y;
     float ny = ab.z * ac.x - ab.x * ac.z;
     float nz = ab.x * ac.y - ab.y * ac.x;
-    n = {nx, ny, nz};
+    n = Vect{-nx, -ny, -nz}.normalize();
   }
   
   if (t == std::numeric_limits<float>::max()) { return { 0.0f, 0.0f, 0.0f }; }
@@ -104,13 +104,35 @@ Color Raytracer::rayCast(Vect &direction) {
 
   std::vector<Light*> point_lights = info->point_lights;
   for (int i = 0; i < point_lights.size(); i++) {
+    //checking for shadow
+    bool inShadow = false;
+    float t_min = 0.0001f;
+
+    for(int i = 0; i < spheres.size(); i++){
+      float return_t;
+      if(hits(hit, point_lights[i]->position - hit, spheres[i], t_min, 1.0f, return_t)){
+        inShadow = true;
+        break;
+      }
+    }
+    if(inShadow){ continue; }
+
+    for(int i = 0; i < triangles.size(); i++){
+      float return_t;
+      if(hits(hit, point_lights[i]->position - hit, triangles[i], t_min, 1.0f, return_t)){
+        inShadow = true;
+        break;
+      }
+    }
+    if(inShadow){ continue; }
+
     Vect l = (point_lights[i]->position - hit).normalize();
     Vect v = (origin - hit).normalize();
     Vect h = (v + l).normalize();
 
     float coef_diffuse = std::max(0.0f, n * l);
     float coef_specular = material.glossiness * std::max(0.0f, std::pow(n * h, material.p));
-    coef_phong += point_lights[i]->intensity * (coef_diffuse + coef_specular);
+    coef_phong += point_lights[i]->intensity/100 * (coef_diffuse + coef_specular);
   }
   color = color * (info->ambient + coef_phong);
 

@@ -19,7 +19,7 @@ int main(int argc, char **argv) {
   Renderer renderer;
 
   Vect origin = {0.0f, 0.0f, 0.0f};
-  Raytracer raytracer(origin, info);
+  Raytracer raytracer(info);
   
   //viewplane borders
   float min = -1.0f;
@@ -34,7 +34,7 @@ int main(int argc, char **argv) {
       
       Vect pixel = {pixel_x, pixel_y, info->focal_length };
       Vect d = pixel - origin;
-      Color c = raytracer.rayCast(d);
+      Color c = raytracer.rayCast(origin, d);
       
       frame.setColor(x, y, c);
     }
