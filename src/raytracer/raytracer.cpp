@@ -58,6 +58,24 @@ bool Raytracer::hits(Vect &origin, Vect &direction, Triangle *triangle, float mi
   return true;
 }
 
+bool Raytracer::inShadow(Vect &origin, Vect &direction, float t_max) {
+  float t_min = 0.0001f;
+
+  std::vector<Sphere *> spheres = info->spheres;
+  for(int i = 0; i < spheres.size(); i++){
+    float return_t;
+    if(hits(origin, direction, spheres[i], t_min, t_max, return_t)){ return true; }
+  }
+
+  std::vector<Triangle *> triangles = info->triangles;
+  for(int i = 0; i < triangles.size(); i++){
+    float return_t;
+    if(hits(origin, direction, triangles[i], t_min, t_max, return_t)){ return true; }
+  }
+
+  return false;
+}
+
 Color Raytracer::rayCast(Vect &origin, Vect &direction) {
   float t = std::numeric_limits<float>::max();
   Material material;
@@ -94,50 +112,38 @@ Color Raytracer::rayCast(Vect &origin, Vect &direction) {
     float nz = ab.x * ac.y - ab.y * ac.x;
     n = Vect{-nx, -ny, -nz}.normalize();
   }
-  
   if (t == std::numeric_limits<float>::max()) { return { 0.0f, 0.0f, 0.0f }; }
-
+  
+  Color color = material.color;
+  float diffuse = 0.0f;
+  float specular = 0.0f;
 
   Vect hit = origin + direction * t;
-  Color color = {material.color.r, material.color.g, material.color.b};
-  Vect diffuse;
-  Vect specular;
+  Vect v = (origin - hit).normalize();
+  bool hasDirLight = info->dir_light != nullptr;
 
   std::vector<Light*> point_lights = info->point_lights;
-  for (int i = 0; i < point_lights.size(); i++) {
-    //checking for shadow
-    bool inShadow = false;
-    float t_min = 0.0001f;
+  for (int i = 0; i <= point_lights.size(); i++) {
+    bool isDirLight = i == point_lights.size();
+    if(isDirLight && !hasDirLight){ break; }
 
-    for(int i = 0; i < spheres.size(); i++){
-      float return_t;
-      if(hits(hit, point_lights[i]->position - hit, spheres[i], t_min, 1.0f, return_t)){
-        inShadow = true;
-        break;
-      }
-    }
-    if(inShadow){ continue; }
+    Vect direction = (hasDirLight && isDirLight) ? -info->dir_light->direction : (point_lights[i]->position - hit);
+    float intensity = (hasDirLight && isDirLight) ? info->dir_light->h_intensity : point_lights[i]->intensity;
+    float t_max = (hasDirLight && isDirLight) ? std::numeric_limits<float>::max() : 1.0f;
 
-    for(int i = 0; i < triangles.size(); i++){
-      float return_t;
-      if(hits(hit, point_lights[i]->position - hit, triangles[i], t_min, 1.0f, return_t)){
-        inShadow = true;
-        break;
-      }
-    }
-    if(inShadow){ continue; }
+    if(inShadow(hit, direction, t_max)){ continue; }
 
-    Vect l = (point_lights[i]->position - hit).normalize();
-    Vect v = (origin - hit).normalize();
+    Vect l = direction.normalize();
     Vect h = (v + l).normalize();
 
-    diffuse = Vect{ color.r, color.b, color.b } * std::max(0.0f, n * l);
-    diffuse = diffuse * (point_lights[i]->intensity/50.0f);
-    specular = Vect{ 1.0f, 1.0f, 1.0f } * material.glossiness * pow(std::max(0.0f, n * h), material.p);
-    specular = specular * (point_lights[i]->intensity/50.0f);
-  }
-  color = color * info->ambient + Color(diffuse.x, diffuse.y, diffuse.z) + Color(specular.x, specular.y, specular.z);
+    float distanceSquared = direction.mag() * direction.mag();
+    float irradiance = (hasDirLight && isDirLight) ? intensity * n*l : intensity / distanceSquared;
 
+    diffuse += irradiance * std::max(0.0f, n * l);
+    specular += irradiance * material.glossiness * pow(std::max(0.0f, n * h), material.p);
+  }
+
+  color = color * (info->ambient + diffuse) + Color{1.0f, 1.0f, 1.0f} * specular;
   return color;
 }
 
