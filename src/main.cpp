@@ -18,34 +18,21 @@ int main(int argc, char **argv) {
   Frame frame;
   Renderer renderer;
 
-  Vect origin = {0.0f, 0.0f, 0.0f};
-  Raytracer raytracer(info);
-  
-  //viewplane borders
-  float min = -1.0f;
-  float max = 1.0f;
-  float aspect_ratio = (float)WIDTH / HEIGHT;
+  float x = -1.0f;
+  Raytracer raytracer({x, 0.0f, 0.0f}, info);
+  raytracer.render(frame);
 
-  for(int y = 0; y < HEIGHT; y++){
-    for(int x = 0; x < WIDTH; x++){
-      float pixel_x = min + (max - min) * ((float)x / WIDTH);
-      float pixel_y = min + (max - min) * ((float)y / HEIGHT);
-      pixel_y /= aspect_ratio;
-      
-      Vect pixel = {pixel_x, pixel_y, info->focal_length };
-      Vect d = pixel - origin;
-      Color c = raytracer.rayCast(origin, d);
-      
-      frame.setColor(x, y, c);
-    }
-  }
-  
   if (!renderer.init(frame)) {
     std::cout << "Failed to init renderer" << std::endl;
     return 1;
   }
   while (renderer.render()) {
-    // frame.clear();
-    // renderer.changeFrame(frame);
+    frame.clear();
+    x += 0.33f;
+    if (x > 1.0f) { x = -1.0f; } 
+
+    raytracer.setOrigin({x, 0.0f, 0.0f});
+    raytracer.render(frame);
+    renderer.changeFrame(frame);
   }
 }

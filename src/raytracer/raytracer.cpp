@@ -140,3 +140,25 @@ Color Raytracer::rayCast(Vect &origin, Vect &direction) {
 
   return color;
 }
+
+void Raytracer::render(Frame &frame) {
+  //viewplane borders
+  float min = -1.0f;
+  float max = 1.0f;
+  float aspect_ratio = (float)WIDTH / HEIGHT;
+
+  for(int y = 0; y < HEIGHT; y++){
+    for(int x = 0; x < WIDTH; x++){
+      float pixel_x = min + (max - min) * ((float)x / WIDTH);
+      float pixel_y = min + (max - min) * ((float)y / HEIGHT);
+      pixel_y /= aspect_ratio;
+      
+      Vect d = Vect{pixel_x, pixel_y, info->focal_length };
+      Color c = rayCast(origin, d);
+      
+      frame.setColor(x, y, c);
+    }
+  }
+}
+
+void Raytracer::setOrigin(Vect origin) { this->origin = origin; }
