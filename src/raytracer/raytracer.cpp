@@ -100,7 +100,8 @@ Color Raytracer::rayCast(Vect &origin, Vect &direction) {
 
   Vect hit = origin + direction * t;
   Color color = {material.color.r, material.color.g, material.color.b};
-  float coef_phong = 0.0f;
+  Vect diffuse;
+  Vect specular;
 
   std::vector<Light*> point_lights = info->point_lights;
   for (int i = 0; i < point_lights.size(); i++) {
@@ -130,11 +131,12 @@ Color Raytracer::rayCast(Vect &origin, Vect &direction) {
     Vect v = (origin - hit).normalize();
     Vect h = (v + l).normalize();
 
-    float coef_diffuse = std::max(0.0f, n * l);
-    float coef_specular = material.glossiness * std::max(0.0f, std::pow(n * h, material.p));
-    coef_phong += point_lights[i]->intensity/100 * (coef_diffuse + coef_specular);
+    diffuse = Vect{ color.r, color.b, color.b } * std::max(0.0f, n * l);
+    diffuse = diffuse * (point_lights[i]->intensity/50.0f);
+    specular = Vect{ 1.0f, 1.0f, 1.0f } * material.glossiness * pow(std::max(0.0f, n * h), material.p);
+    specular = specular * (point_lights[i]->intensity/50.0f);
   }
-  color = color * (info->ambient + coef_phong);
+  color = color * info->ambient + Color(diffuse.x, diffuse.y, diffuse.z) + Color(specular.x, specular.y, specular.z);
 
   return color;
 }
