@@ -20,12 +20,19 @@ int main(int argc, char **argv) {
 
   Vect origin = {0.0f, 0.0f, 0.0f};
   Raytracer raytracer(origin, info);
+  
+  //viewplane borders
   float min = -1.0f;
   float max = 1.0f;
+  float aspect_ratio = (float)WIDTH / HEIGHT;
 
   for(int y = 0; y < HEIGHT; y++){
     for(int x = 0; x < WIDTH; x++){
-      Vect pixel = {(min + 2*(x + 0.5f)/WIDTH), min + 2*(y + 0.5f)/HEIGHT, info->focal_length};
+      float pixel_x = min + (max - min) * ((float)x / WIDTH);
+      float pixel_y = min + (max - min) * ((float)y / HEIGHT);
+      pixel_y /= aspect_ratio;
+      
+      Vect pixel = {pixel_x, pixel_y, info->focal_length };
       Vect d = pixel - origin;
       Color c = raytracer.rayCast(d);
       
