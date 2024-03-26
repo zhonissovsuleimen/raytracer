@@ -19,7 +19,7 @@ public:
     Matrix3D operator*=(float f);
     Matrix3D operator/=(float f);
 
-    float deteminant();
+    float det();
     Matrix3D transpose();
 };
 

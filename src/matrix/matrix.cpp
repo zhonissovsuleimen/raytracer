@@ -71,7 +71,7 @@ Matrix3D Matrix3D::operator/=(float f) {
   return *this;
 }
 
-float Matrix3D::deteminant() {
+float Matrix3D::det() {
   return data[0] * (data[4] * data[8] - data[5] * data[7]) -
          data[1] * (data[3] * data[8] - data[5] * data[6]) +
          data[2] * (data[3] * data[7] - data[4] * data[6]);

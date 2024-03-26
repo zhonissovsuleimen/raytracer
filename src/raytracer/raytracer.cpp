@@ -31,27 +31,27 @@ bool Raytracer::hits(Vect &origin, Vect &direction, Triangle *triangle, float mi
                       p0.y - p1.y, p0.y - p2.y, direction.y,
                       p0.z - p1.z, p0.z - p2.z, direction.z};
 
-  float detA = matrixA.deteminant();
+  float detA = matrixA.det();
 
   Matrix3D matrixT = {p0.x - p1.x, p0.x - p2.x, p0.x - origin.x,
                       p0.y - p1.y, p0.y - p2.y, p0.y - origin.y,
                       p0.z - p1.z, p0.z - p2.z, p0.z - origin.z};
 
-  float t = matrixT.deteminant() / detA;
+  float t = matrixT.det() / detA;
   if (t < min_t || t >= max_t) { return false; }
 
   Matrix3D matrixGamma = {p0.x - p1.x, p0.x - origin.x, direction.x,
                           p0.y - p1.y, p0.y - origin.y, direction.y,
                           p0.z - p1.z, p0.z - origin.z, direction.z};
 
-  float gamma = matrixGamma.deteminant() / detA;
+  float gamma = matrixGamma.det() / detA;
   if (gamma < 0.0f || gamma > 1.0f) { return false; }
 
   Matrix3D matrixBeta = {p0.x - origin.x, p0.x - p2.x, direction.x,
                          p0.y - origin.y, p0.y - p2.y, direction.y,
                          p0.z - origin.z, p0.z - p2.z, direction.z};
 
-  float beta = matrixBeta.deteminant() / detA;
+  float beta = matrixBeta.det() / detA;
   if (beta < 0.0f || beta > 1.0f - gamma) { return false; }
   
   return_t = t;
