@@ -78,7 +78,7 @@ bool Raytracer::inShadow(Vect &origin, Vect &direction, float t_max) {
   return false;
 }
 
-Color Raytracer::rayCast(Vect &origin, Vect &direction) {
+Color Raytracer::rayCast(Vect &origin, Vect &direction, int bounces) {
   float t = std::numeric_limits<float>::max();
   Material material;
   Vect n;
@@ -144,7 +144,16 @@ Color Raytracer::rayCast(Vect &origin, Vect &direction) {
     specular += irradiance * material.glossiness * pow(std::max(0.0f, n * h), material.p);
   }
 
-  color = color * (info->ambient + diffuse) + Color{1.0f, 1.0f, 1.0f} * specular;
+  Color reflection;
+  if(bounces > 0 && material.mirror > 0.0f){
+    Vect r = direction - n * 2.0f * (direction * n);
+    reflection = rayCast(hit, r, bounces-1) * material.mirror;
+  }
+
+  color = color * (info->ambient + diffuse);
+  color += Color{1.0f, 1.0f, 1.0f} * specular;
+  color += reflection;
+
   return color;
 }
 
@@ -152,6 +161,8 @@ void Raytracer::render(Frame &frame) {
   //viewplane borders
   float min = -1.0f;
   float max = 1.0f;
+
+  int bounces = 3;
   float aspect_ratio = (float)WIDTH / HEIGHT;
 
   for(int y = 0; y < HEIGHT; y++){
@@ -159,9 +170,9 @@ void Raytracer::render(Frame &frame) {
       float pixel_x = min + (max - min) * ((float)x / WIDTH);
       float pixel_y = min + (max - min) * ((float)y / HEIGHT);
       pixel_y /= aspect_ratio;
-      
+     
       Vect d = Vect{pixel_x, pixel_y, info->focal_length };
-      Color c = rayCast(origin, d);
+      Color c = rayCast(origin, d, bounces);
       
       frame.setColor(x, y, c);
     }
