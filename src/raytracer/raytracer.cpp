@@ -165,18 +165,28 @@ void Raytracer::render(Frame &frame) {
   int bounces = 3;
   float aspect_ratio = (float)WIDTH / HEIGHT;
 
+  float rad = theta * 3.1415926f / 180.0f;
+  float sin_theta = sin(rad);
+  float cos_theta = cos(rad);
+
   for(int y = 0; y < HEIGHT; y++){
     for(int x = 0; x < WIDTH; x++){
       float pixel_x = min + (max - min) * ((float)x / WIDTH);
       float pixel_y = min + (max - min) * ((float)y / HEIGHT);
       pixel_y /= aspect_ratio;
-     
-      Vect d = Vect{pixel_x, pixel_y, info->focal_length };
-      Color c = rayCast(origin, d, bounces);
       
+      float z = info->focal_length;
+      pixel_x = cos_theta * pixel_x - sin_theta * z;
+      z = sin_theta * pixel_x + cos_theta * z;
+
+      Vect d = Vect{pixel_x, pixel_y, z };
+      Color c = rayCast(origin, d, bounces);
+
       frame.setColor(x, y, c);
     }
   }
 }
 
-void Raytracer::setOrigin(Vect origin) { this->origin = origin; }
+//void Raytracer::setOrigin(Vect origin) { this->origin = origin; }
+
+void Raytracer::setTheta(float theta) { this->theta = theta; }

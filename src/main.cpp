@@ -25,7 +25,17 @@ int main(int argc, char **argv) {
     std::cout << "Failed to init renderer" << std::endl;
     return 1;
   }
-  while (renderer.render()) {
 
+  float theta = 0.0f;
+  while (renderer.render()) {
+    frame.clear();
+    raytracer.setTheta(theta);
+    raytracer.render(frame);
+    renderer.changeFrame(frame);
+
+    theta += 1.0f;
+    if (theta > 15.0f){
+      theta = -15.0f;
+    }
   }
 }
