@@ -4,9 +4,11 @@ bool Raytracer::hits(Vect &origin, Vect &direction, Sphere *sphere, float min_t,
   Vect center = sphere->center;
   float radius = sphere->radius;
 
+  Vect oc = origin - center;
+
   float a = direction * direction;
-  float b = (2 * direction) * (origin - center);
-  float c = (origin - center) * (origin - center) - radius * radius;
+  float b = (2 * direction) * oc;
+  float c = oc * oc - radius * radius;
 
   float discriminant = b * b - 4 * a * c;
   if (discriminant < 0.0f) { return false; }
@@ -21,7 +23,7 @@ bool Raytracer::hits(Vect &origin, Vect &direction, Sphere *sphere, float min_t,
   return true;
 }
 
-bool Raytracer::hits(Vect &origin, Vect &direction, Triangle *triangle, float min_t, float max_t, float &return_t) {
+bool Raytracer::hits(Vect &origin, Vect &direction, Triangle *triangle, float t_min, float t_max, float &return_t) {
   Vect p0 = triangle->p0;
   Vect p1 = triangle->p1;
   Vect p2 = triangle->p2;
@@ -32,25 +34,22 @@ bool Raytracer::hits(Vect &origin, Vect &direction, Triangle *triangle, float mi
   float d = p0.x - p2.x;
   float e = p0.y - p2.y;
   float f = p0.z - p2.z;
-  float g = direction.x;
-  float h = direction.y;
-  float i = direction.z;
   float j = p0.x - origin.x;
   float k = p0.y - origin.y;
   float l = p0.z - origin.z;
 
-  float ei_hf = e * i - h * f;
-  float gf_di = g * f - d * i;
-  float dh_eg = d * h - e * g;
+  float ei_hf = e * direction.z - direction.y * f;
+  float gf_di = direction.x * f - d * direction.z;
+  float dh_eg = d * direction.y - e * direction.x;
   float ak_jb = a * k - j * b;
   float jc_al = j * c - a * l;
   float bl_kc = b * l - k * c;
 
   float M = a * ei_hf + b * gf_di + c * dh_eg;
   float t = -(f * ak_jb + e * jc_al + d * bl_kc) / M;
-  if (t < min_t || t >= max_t) { return false; }
+  if (t < t_min || t >= t_max) { return false; }
 
-  float gamma = (i * ak_jb + h * jc_al + g * bl_kc) / M;
+  float gamma = (direction.z * ak_jb + direction.y * jc_al + direction.x * bl_kc) / M;
   if (gamma < 0.0f || gamma > 1.0f) { return false; }
 
   float beta = (j * ei_hf + k * gf_di + l * dh_eg) / M;
@@ -63,15 +62,14 @@ bool Raytracer::hits(Vect &origin, Vect &direction, Triangle *triangle, float mi
 bool Raytracer::inShadow(Vect &origin, Vect &direction, float t_max) {
   float t_min = 0.0001f;
 
+  float return_t;
   std::vector<Sphere *> spheres = info->spheres;
   for(int i = 0; i < spheres.size(); i++){
-    float return_t;
     if(hits(origin, direction, spheres[i], t_min, t_max, return_t)){ return true; }
   }
 
   std::vector<Triangle *> triangles = info->triangles;
   for(int i = 0; i < triangles.size(); i++){
-    float return_t;
     if(hits(origin, direction, triangles[i], t_min, t_max, return_t)){ return true; }
   }
 
